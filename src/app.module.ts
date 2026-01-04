@@ -5,6 +5,7 @@ import { NgosModule } from './ngos/ngos.module';
 import { CasesModule } from './cases/cases.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AdoptionsModule } from './adoptions/adoptions.module';
+import { HealthModule } from './health/health.module';
 import { ConfigModule } from './config/config.module';
 
 @Module({
@@ -19,6 +20,7 @@ import { ConfigModule } from './config/config.module';
     NgosModule,
     CasesModule,
     AdoptionsModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
