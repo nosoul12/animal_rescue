@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  Citizen
+  NGO
+}
+
+enum CaseType {
+  INJURED
+  NEWBORN
+  EMERGENCY
+  ADOPTION
+}
+
+enum CaseSeverity {
+  Critical
+  Urgent
+  Moderate
+  Low
+}
+
+enum CaseStatus {
+  Reported
+  InProgress
+  Resolved
+  Closed
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+
+  cases      Case[] @relation("ReportedCases")
+  ngoProfile NGO?
+
+  createdAt DateTime @default(now())
+}
+
+model NGO {
+  id       String  @id @default(uuid())
+  userId   String  @unique
+  name     String
+  phone    String
+  verified Boolean @default(false)
+
+  user  User   @relation(fields: [userId], references: [id])
+  cases Case[] @relation("AssignedCases")
+}
+
+model Case {
+  id          String        @id @default(uuid())
+  title       String
+  description String
+  type        CaseType
+  severity    CaseSeverity?
+  status      CaseStatus    @default(Reported)
+
+  latitude  Float
+  longitude Float
+  imageUrl  String
+
+  animalType  String?
+  tags        String[]      @default([])
+  animalCount Int?
+
+  reportedById  String
+  assignedNgoId String?
+
+  reportedBy  User @relation("ReportedCases", fields: [reportedById], references: [id])
+  assignedNgo NGO? @relation("AssignedCases", fields: [assignedNgoId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
