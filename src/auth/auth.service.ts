@@ -95,7 +95,10 @@ export class AuthService {
       include: { ngoProfile: true },
     });
 
-    const payload = { userId: createdUser.id, role: createdUser.role };
+    const payload = { 
+      userId: createdUser.id, 
+      role: createdUser.role === Role.NGO ? 'NGO' : 'Citizen' 
+    };
     const token = this.jwtService.sign(payload);
 
     return { access_token: token, token };
@@ -130,7 +133,10 @@ export class AuthService {
     const match = await bcrypt.compare(password, user.passwordHash);
     if (!match) throw new UnauthorizedException('Invalid credentials');
 
-    const payload = { userId: user.id, role: user.role };
+    const payload = { 
+      userId: user.id, 
+      role: user.role === Role.NGO ? 'NGO' : 'Citizen' 
+    };
     const token = this.jwtService.sign(payload);
 
     return { access_token: token, token };

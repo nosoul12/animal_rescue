@@ -10,12 +10,27 @@ export class AdoptionsService {
     private readonly cloudinary: CloudinaryService,
   ) {}
 
-  listAdoptions() {
-    return this.prisma.case.findMany({
+  async listAdoptions() {
+    const adoptions = await this.prisma.case.findMany({
       where: { type: CaseType.ADOPTION },
       orderBy: { createdAt: 'desc' },
-      include: { reportedBy: true, assignedNgo: true },
+      include: { 
+        reportedBy: true, 
+        assignedNgo: {
+          include: { user: true }
+        }
+      },
     });
+    
+    // Transform assignedNgo to include user data for Flutter compatibility
+    return adoptions.map(a => ({
+      ...a,
+      assignedNgo: a.assignedNgo ? {
+        id: a.assignedNgo.user.id,
+        name: a.assignedNgo.user.name,
+        email: a.assignedNgo.user.email,
+      } : null,
+    }));
   }
 
   async createAdoption(params: {
@@ -69,7 +84,7 @@ export class AdoptionsService {
         ? undefined
         : Number(body.animalCount);
 
-    return this.prisma.case.create({
+    const created = await this.prisma.case.create({
       data: {
         title,
         description,
@@ -83,7 +98,22 @@ export class AdoptionsService {
         tags,
         reportedById,
       },
-      include: { reportedBy: true, assignedNgo: true },
+      include: { 
+        reportedBy: true, 
+        assignedNgo: {
+          include: { user: true }
+        }
+      },
     });
+    
+    // Transform assignedNgo to include user data for Flutter compatibility
+    return {
+      ...created,
+      assignedNgo: created.assignedNgo ? {
+        id: created.assignedNgo.user.id,
+        name: created.assignedNgo.user.name,
+        email: created.assignedNgo.user.email,
+      } : null,
+    };
   }
 }

@@ -54,14 +54,22 @@ export class CasesController {
 
   @Put(':id')
   @UseGuards(JwtAuthGuard)
-  updateCase(@Param('id') id: string, @Body() body: any) {
-    return this.casesService.updateCase(id, body);
+  updateCase(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.casesService.updateCase(id, body, req.user.userId);
   }
 
   @Patch(':id/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('NGO')
-  respondToCase(@Req() req: any, @Param('id') id: string) {
+  respondToCase(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    // If status is provided in body, use it; otherwise auto-assign and set to InProgress
+    if (body?.status) {
+      return this.casesService.updateCaseStatus(id, body.status, req.user.userId);
+    }
     return this.casesService.ngoRespondToCase({
       caseId: id,
       userId: req.user.userId,

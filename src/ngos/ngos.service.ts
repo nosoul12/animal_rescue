@@ -48,12 +48,24 @@ export class NgosService {
       where: {
         type: { not: CaseType.ADOPTION },
       },
-      include: { reportedBy: true, assignedNgo: true },
+      include: { 
+        reportedBy: true, 
+        assignedNgo: {
+          include: { user: true }
+        }
+      },
     });
 
-    return cases
+    const transformedCases = cases
       .map((c) => ({
-        c,
+        c: {
+          ...c,
+          assignedNgo: c.assignedNgo ? {
+            id: c.assignedNgo.user.id,
+            name: c.assignedNgo.user.name,
+            email: c.assignedNgo.user.email,
+          } : null,
+        },
         distance: haversineDistanceKm(lat, lng, c.latitude, c.longitude),
       }))
       .filter((x) => x.distance <= radiusKm)
@@ -63,5 +75,7 @@ export class NgosService {
         return a.distance - b.distance;
       })
       .map((x) => x.c);
+    
+    return transformedCases;
   }
 }
