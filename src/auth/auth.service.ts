@@ -4,7 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Role } from '@prisma/client';
+import { CaseType, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -140,5 +140,58 @@ export class AuthService {
     const token = this.jwtService.sign(payload);
 
     return { access_token: token, token };
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { ngoProfile: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const [reportedCases, adoptionListings] = await this.prisma.$transaction([
+      this.prisma.case.count({
+        where: {
+          reportedById: user.id,
+          type: { not: CaseType.ADOPTION },
+        },
+      }),
+      this.prisma.case.count({
+        where: {
+          reportedById: user.id,
+          type: CaseType.ADOPTION,
+        },
+      }),
+    ]);
+
+    const assignedCases = user.ngoProfile
+      ? await this.prisma.case.count({
+          where: { assignedNgoId: user.ngoProfile.id },
+        })
+      : 0;
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role === Role.NGO ? 'NGO' : 'Citizen',
+      createdAt: user.createdAt,
+      ngo: user.ngoProfile
+        ? {
+            id: user.ngoProfile.id,
+            name: user.ngoProfile.name,
+            phone: user.ngoProfile.phone,
+            verified: user.ngoProfile.verified,
+          }
+        : null,
+      stats: {
+        reportedCases,
+        adoptionListings,
+        assignedCases,
+      },
+    };
   }
 }
