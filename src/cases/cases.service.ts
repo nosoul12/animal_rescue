@@ -303,4 +303,51 @@ export class CasesService {
       } : null,
     };
   }
+
+  async deleteCase(params: { caseId: string; userId: string }) {
+    const { caseId, userId } = params;
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { ngoProfile: true },
+    });
+
+    if (!user || user.role !== Role.NGO) {
+      throw new ForbiddenException('NGO role required');
+    }
+
+    if (!user.ngoProfile) {
+      throw new ForbiddenException('NGO profile not found');
+    }
+
+    const existing = await this.prisma.case.findUnique({ where: { id: caseId } });
+    if (!existing || existing.type === CaseType.ADOPTION) {
+      throw new NotFoundException('Case not found');
+    }
+
+    if (existing.assignedNgoId && existing.assignedNgoId !== user.ngoProfile.id) {
+      throw new ForbiddenException('Case assigned to another NGO');
+    }
+
+    const deleted = await this.prisma.case.delete({
+      where: { id: caseId },
+      include: {
+        reportedBy: true,
+        assignedNgo: {
+          include: { user: true },
+        },
+      },
+    });
+
+    return {
+      ...deleted,
+      assignedNgo: deleted.assignedNgo
+        ? {
+            id: deleted.assignedNgo.user.id,
+            name: deleted.assignedNgo.user.name,
+            email: deleted.assignedNgo.user.email,
+          }
+        : null,
+    };
+  }
 }

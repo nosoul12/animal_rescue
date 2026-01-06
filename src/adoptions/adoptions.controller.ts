@@ -1,6 +1,8 @@
 import {
   Controller,
+  Delete,
   Get,
+  Param,
   Post,
   Req,
   UploadedFile,
@@ -12,6 +14,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { AdoptionsService } from './adoptions.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('adoptions')
 export class AdoptionsController {
@@ -39,6 +43,16 @@ export class AdoptionsController {
       reportedById: req.user.userId,
       body,
       file,
+    });
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('NGO')
+  deleteAdoption(@Req() req: any, @Param('id') id: string) {
+    return this.adoptionsService.deleteAdoption({
+      caseId: id,
+      userId: req.user.userId,
     });
   }
 }

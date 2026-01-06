@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -71,6 +72,16 @@ export class CasesController {
       return this.casesService.updateCaseStatus(id, body.status, req.user.userId);
     }
     return this.casesService.ngoRespondToCase({
+      caseId: id,
+      userId: req.user.userId,
+    });
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('NGO')
+  deleteCase(@Req() req: any, @Param('id') id: string) {
+    return this.casesService.deleteCase({
       caseId: id,
       userId: req.user.userId,
     });
