@@ -13,22 +13,23 @@ export class CasesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudinary: CloudinaryService,
-  ) {}
+  ) { }
 
   async listCases() {
     const cases = await this.prisma.case.findMany({
       where: {
         type: { not: CaseType.ADOPTION },
+        deletedAt: null,
       },
       orderBy: { createdAt: 'desc' },
-      include: { 
-        reportedBy: true, 
+      include: {
+        reportedBy: true,
         assignedNgo: {
           include: { user: true }
         }
       },
     });
-    
+
     // Transform assignedNgo to include user data for Flutter compatibility
     return cases.map(c => ({
       ...c,
@@ -43,16 +44,16 @@ export class CasesService {
   async getCaseById(id: string) {
     const found = await this.prisma.case.findUnique({
       where: { id },
-      include: { 
-        reportedBy: true, 
+      include: {
+        reportedBy: true,
         assignedNgo: {
           include: { user: true }
         }
       },
     });
 
-    if (!found) throw new NotFoundException('Case not found');
-    
+    if (!found || found.deletedAt) throw new NotFoundException('Case not found');
+
     // Transform assignedNgo to include user data for Flutter compatibility
     return {
       ...found,
@@ -107,16 +108,16 @@ export class CasesService {
       ? body.tags
       : typeof body?.tags === 'string'
         ? (() => {
-            try {
-              const parsed = JSON.parse(body.tags);
-              return Array.isArray(parsed) ? parsed : [];
-            } catch {
-              return body.tags
-                .split(',')
-                .map((t: string) => t.trim())
-                .filter(Boolean);
-            }
-          })()
+          try {
+            const parsed = JSON.parse(body.tags);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return body.tags
+              .split(',')
+              .map((t: string) => t.trim())
+              .filter(Boolean);
+          }
+        })()
         : [];
 
     const animalCount =
@@ -139,14 +140,14 @@ export class CasesService {
         tags,
         reportedById,
       },
-      include: { 
-        reportedBy: true, 
+      include: {
+        reportedBy: true,
         assignedNgo: {
           include: { user: true }
         }
       },
     });
-    
+
     // Transform assignedNgo to include user data for Flutter compatibility
     return {
       ...created,
@@ -160,7 +161,7 @@ export class CasesService {
 
   async updateCase(id: string, body: any, userId: string) {
     const existing = await this.prisma.case.findUnique({ where: { id } });
-    if (!existing) throw new NotFoundException('Case not found');
+    if (!existing || existing.deletedAt) throw new NotFoundException('Case not found');
 
     // Only the case creator can update the case
     if (existing.reportedById !== userId) {
@@ -185,14 +186,14 @@ export class CasesService {
     const updated = await this.prisma.case.update({
       where: { id },
       data,
-      include: { 
-        reportedBy: true, 
+      include: {
+        reportedBy: true,
         assignedNgo: {
           include: { user: true }
         }
       },
     });
-    
+
     // Transform assignedNgo to include user data for Flutter compatibility
     return {
       ...updated,
@@ -219,7 +220,7 @@ export class CasesService {
     }
 
     const existing = await this.prisma.case.findUnique({ where: { id: caseId } });
-    if (!existing) throw new NotFoundException('Case not found');
+    if (!existing || existing.deletedAt) throw new NotFoundException('Case not found');
 
     // Validate status
     const validStatuses = Object.values(CaseStatus);
@@ -237,14 +238,14 @@ export class CasesService {
     const updated = await this.prisma.case.update({
       where: { id: caseId },
       data: updateData,
-      include: { 
-        reportedBy: true, 
+      include: {
+        reportedBy: true,
         assignedNgo: {
           include: { user: true }
         }
       },
     });
-    
+
     // Transform assignedNgo to include user data for Flutter compatibility
     return {
       ...updated,
@@ -273,7 +274,7 @@ export class CasesService {
     }
 
     const existing = await this.prisma.case.findUnique({ where: { id: caseId } });
-    if (!existing) throw new NotFoundException('Case not found');
+    if (!existing || existing.deletedAt) throw new NotFoundException('Case not found');
 
     if (existing.assignedNgoId && existing.assignedNgoId !== user.ngoProfile.id) {
       throw new ForbiddenException('Case already assigned');
@@ -285,14 +286,14 @@ export class CasesService {
         status: CaseStatus.InProgress,
         assignedNgoId: user.ngoProfile.id,
       },
-      include: { 
-        reportedBy: true, 
+      include: {
+        reportedBy: true,
         assignedNgo: {
           include: { user: true }
         }
       },
     });
-    
+
     // Transform assignedNgo to include user data for Flutter compatibility
     return {
       ...updated,
@@ -321,16 +322,17 @@ export class CasesService {
     }
 
     const existing = await this.prisma.case.findUnique({ where: { id: caseId } });
-    if (!existing || existing.type === CaseType.ADOPTION) {
+    if (!existing || existing.type === CaseType.ADOPTION || existing.deletedAt) {
       throw new NotFoundException('Case not found');
     }
 
-    if (existing.assignedNgoId && existing.assignedNgoId !== user.ngoProfile.id) {
-      throw new ForbiddenException('Case assigned to another NGO');
+    if (existing.assignedNgoId !== user.ngoProfile.id) {
+      throw new ForbiddenException('You can only delete cases assigned to your NGO');
     }
 
-    const deleted = await this.prisma.case.delete({
+    const deleted = await this.prisma.case.update({
       where: { id: caseId },
+      data: { deletedAt: new Date() },
       include: {
         reportedBy: true,
         assignedNgo: {
@@ -343,10 +345,10 @@ export class CasesService {
       ...deleted,
       assignedNgo: deleted.assignedNgo
         ? {
-            id: deleted.assignedNgo.user.id,
-            name: deleted.assignedNgo.user.name,
-            email: deleted.assignedNgo.user.email,
-          }
+          id: deleted.assignedNgo.user.id,
+          name: deleted.assignedNgo.user.name,
+          email: deleted.assignedNgo.user.email,
+        }
         : null,
     };
   }
